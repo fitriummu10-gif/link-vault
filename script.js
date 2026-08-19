@@ -1,10 +1,36 @@
 // ========================================
-// DATA AWAL
+// LINK VAULT - SUPABASE VERSION
 // ========================================
 
-let links = JSON.parse(localStorage.getItem("linkVault")) || [
+// ========================================
+// SUPABASE
+// ========================================
+
+const SUPABASE_URL = "https://gkailfxyrpazjxnxxsva.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8hZq6onMtZH4elKRKCGSMQ_AoBgm8j-";
+
+const { createClient } = window.supabase;
+
+const db = createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
+
+// ========================================
+// DATA
+// ========================================
+
+let links = [];
+
+let currentCategory = "Semua";
+let favoritesOnly = false;
+
+
+// Data awal.
+// Data ini hanya akan dimasukkan jika tabel Supabase kosong.
+const defaultLinks = [
     {
-        id: 1,
         name: "Template PPT Presentasi",
         url: "https://www.canva.com/",
         category: "Canva",
@@ -13,7 +39,6 @@ let links = JSON.parse(localStorage.getItem("linkVault")) || [
     },
 
     {
-        id: 2,
         name: "Template Instagram Post",
         url: "https://www.canva.com/",
         category: "Design",
@@ -22,7 +47,6 @@ let links = JSON.parse(localStorage.getItem("linkVault")) || [
     },
 
     {
-        id: 3,
         name: "Google Drive Kuliah",
         url: "https://drive.google.com/",
         category: "Dokumen",
@@ -32,21 +56,85 @@ let links = JSON.parse(localStorage.getItem("linkVault")) || [
 ];
 
 
-let currentCategory = "Semua";
-let favoritesOnly = false;
-
-
 // ========================================
-// SAVE DATA
+// LOAD DATA DARI SUPABASE
 // ========================================
 
-function saveData() {
+async function loadData() {
 
-    localStorage.setItem(
-        "linkVault",
-        JSON.stringify(links)
-    );
+    try {
 
+        const { data, error } = await db
+            .from("links")
+            .select("*")
+            .order("id", { ascending: true });
+
+        if (error) {
+
+            console.error(
+                "Gagal mengambil data dari Supabase:",
+                error
+            );
+
+            showToast("Gagal mengambil data dari database.");
+
+            return;
+        }
+
+
+        // Jika tabel Supabase masih kosong,
+        // masukkan data awal.
+        if (!data || data.length === 0) {
+
+            const {
+                data: insertedData,
+                error: insertError
+            } = await db
+                .from("links")
+                .insert(defaultLinks)
+                .select();
+
+
+            if (insertError) {
+
+                console.error(
+                    "Gagal memasukkan data awal:",
+                    insertError
+                );
+
+                links = [];
+
+                displayLinks();
+
+                return;
+            }
+
+
+            links = insertedData || [];
+
+        } else {
+
+            links = data;
+
+        }
+
+
+        displayLinks();
+
+
+        console.log(
+            "Data berhasil dimuat dari Supabase:",
+            links
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Terjadi kesalahan saat load data:",
+            error
+        );
+
+    }
 }
 
 
@@ -62,22 +150,35 @@ function displayLinks(data = links) {
     const emptyState =
         document.getElementById("emptyState");
 
+
+    if (!container) return;
+
+
     container.innerHTML = "";
 
 
     let filtered = data.filter(link => {
 
-        if (currentCategory !== "Semua" &&
-            link.category !== currentCategory) {
+
+        if (
+            currentCategory !== "Semua" &&
+            link.category !== currentCategory
+        ) {
 
             return false;
+
         }
 
-        if (favoritesOnly &&
-            !link.favorite) {
+
+        if (
+            favoritesOnly &&
+            !link.favorite
+        ) {
 
             return false;
+
         }
+
 
         return true;
 
@@ -86,11 +187,19 @@ function displayLinks(data = links) {
 
     if (filtered.length === 0) {
 
-        emptyState.style.display = "block";
+        if (emptyState) {
+
+            emptyState.style.display = "block";
+
+        }
 
     } else {
 
-        emptyState.style.display = "none";
+        if (emptyState) {
+
+            emptyState.style.display = "none";
+
+        }
 
     }
 
@@ -100,7 +209,9 @@ function displayLinks(data = links) {
         const card =
             document.createElement("div");
 
-        card.className = "link-card";
+
+        card.className =
+            "link-card";
 
 
         const icon =
@@ -115,60 +226,83 @@ function displayLinks(data = links) {
                     ${icon}
                 </div>
 
+
                 <button
                     class="favorite ${link.favorite ? "active" : ""}"
                     onclick="toggleFavorite(${link.id})"
+                    aria-label="Favorite"
                 >
+
                     ${link.favorite ? "♥" : "♡"}
+
                 </button>
 
             </div>
 
 
             <h3>
+
                 ${escapeHTML(link.name)}
+
             </h3>
 
 
             <p>
+
                 ${escapeHTML(
                     link.description ||
                     "Tidak ada deskripsi."
                 )}
+
             </p>
 
 
             <span class="link-url">
+
                 ${escapeHTML(link.url)}
+
             </span>
 
 
             <div class="card-actions">
 
+
                 <button
-                    onclick="copyLink('${link.url}')"
+                    onclick="copyLink(${JSON.stringify(link.url)})"
                 >
+
                     📋 Copy
+
                 </button>
+
 
                 <button
                     onclick="editLink(${link.id})"
                 >
+
                     ✏ Edit
+
                 </button>
+
 
                 <button
                     onclick="deleteLink(${link.id})"
                 >
+
                     🗑 Hapus
+
                 </button>
+
 
                 <button
                     class="open-button"
-                    onclick="openLink('${link.url}')"
+                    onclick="openLink(${JSON.stringify(link.url)})"
                 >
+
                     Buka
+
                 </button>
+
 
             </div>
 
@@ -203,6 +337,7 @@ function getCategoryIcon(category) {
 
     };
 
+
     return icons[category] || "🔗";
 
 }
@@ -214,27 +349,53 @@ function getCategoryIcon(category) {
 
 function updateStatistics(resultCount) {
 
-    document.getElementById("totalLinks")
-        .textContent = links.length;
+    const totalLinks =
+        document.getElementById("totalLinks");
+
+    const canvaCount =
+        document.getElementById("canvaCount");
+
+    const favoriteCount =
+        document.getElementById("favoriteCount");
+
+    const resultCountElement =
+        document.getElementById("resultCount");
 
 
-    document.getElementById("canvaCount")
-        .textContent =
-        links.filter(
-            link => link.category === "Canva"
-        ).length;
+    if (totalLinks) {
+
+        totalLinks.textContent =
+            links.length;
+
+    }
 
 
-    document.getElementById("favoriteCount")
-        .textContent =
-        links.filter(
-            link => link.favorite
-        ).length;
+    if (canvaCount) {
+
+        canvaCount.textContent =
+            links.filter(
+                link => link.category === "Canva"
+            ).length;
+
+    }
 
 
-    document.getElementById("resultCount")
-        .textContent =
-        `${resultCount} links`;
+    if (favoriteCount) {
+
+        favoriteCount.textContent =
+            links.filter(
+                link => link.favorite
+            ).length;
+
+    }
+
+
+    if (resultCountElement) {
+
+        resultCountElement.textContent =
+            `${resultCount} links`;
+
+    }
 
 }
 
@@ -245,27 +406,30 @@ function updateStatistics(resultCount) {
 
 function filterCategory(category, button) {
 
-    currentCategory = category;
-
-    favoritesOnly = false;
-
-
-    document.querySelectorAll(
-        ".category"
-    ).forEach(btn => {
-
-        btn.classList.remove("active");
-
-    });
+    currentCategory =
+        category;
 
 
-    document.querySelectorAll(
-        ".nav-item"
-    ).forEach(btn => {
+    favoritesOnly =
+        false;
 
-        btn.classList.remove("active");
 
-    });
+    document
+        .querySelectorAll(".category")
+        .forEach(btn => {
+
+            btn.classList.remove("active");
+
+        });
+
+
+    document
+        .querySelectorAll(".nav-item")
+        .forEach(btn => {
+
+            btn.classList.remove("active");
+
+        });
 
 
     if (button) {
@@ -281,35 +445,42 @@ function filterCategory(category, button) {
 
 
 // ========================================
-// FAVORITES
+// FAVORITES FILTER
 // ========================================
 
 function showFavorites(button) {
 
-    favoritesOnly = true;
-
-    currentCategory = "Semua";
-
-
-    document.querySelectorAll(
-        ".nav-item"
-    ).forEach(btn => {
-
-        btn.classList.remove("active");
-
-    });
+    favoritesOnly =
+        true;
 
 
-    button.classList.add("active");
+    currentCategory =
+        "Semua";
 
 
-    document.querySelectorAll(
-        ".category"
-    ).forEach(btn => {
+    document
+        .querySelectorAll(".nav-item")
+        .forEach(btn => {
 
-        btn.classList.remove("active");
+            btn.classList.remove("active");
 
-    });
+        });
+
+
+    if (button) {
+
+        button.classList.add("active");
+
+    }
+
+
+    document
+        .querySelectorAll(".category")
+        .forEach(btn => {
+
+            btn.classList.remove("active");
+
+        });
 
 
     displayLinks();
@@ -323,20 +494,43 @@ function showFavorites(button) {
 
 function searchLinks() {
 
+    const searchInput =
+        document.getElementById("searchInput");
+
+
     const keyword =
-        document
-            .getElementById("searchInput")
-            .value
-            .toLowerCase();
+        (searchInput?.value || "")
+            .toLowerCase()
+            .trim();
 
 
     const result =
         links.filter(link => {
 
             return (
-                link.name.toLowerCase().includes(keyword) ||
-                link.description.toLowerCase().includes(keyword) ||
-                link.category.toLowerCase().includes(keyword)
+
+                (link.name || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
+                ||
+
+                (link.description || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
+                ||
+
+                (link.category || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
+                ||
+
+                (link.url || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
             );
 
         });
@@ -356,50 +550,82 @@ function openModal(editData = null) {
     const modal =
         document.getElementById("modal");
 
+
+    if (!modal) return;
+
+
     modal.classList.add("show");
 
 
     if (editData) {
 
+
         document.getElementById("modalTitle")
-            .textContent = "Edit Link";
+            .textContent =
+            "Edit Link";
+
 
         document.getElementById("editId")
-            .value = editData.id;
+            .value =
+            editData.id;
+
 
         document.getElementById("linkName")
-            .value = editData.name;
+            .value =
+            editData.name;
+
 
         document.getElementById("linkUrl")
-            .value = editData.url;
+            .value =
+            editData.url;
+
 
         document.getElementById("linkCategory")
-            .value = editData.category;
+            .value =
+            editData.category;
+
 
         document.getElementById("linkDescription")
-            .value = editData.description;
+            .value =
+            editData.description || "";
+
 
     } else {
 
+
         document.getElementById("modalTitle")
-            .textContent = "Tambah Link";
+            .textContent =
+            "Tambah Link";
+
 
         document.getElementById("linkForm")
             .reset();
 
+
         document.getElementById("editId")
-            .value = "";
+            .value =
+            "";
 
     }
 
 }
 
 
+// ========================================
+// CLOSE MODAL
+// ========================================
+
 function closeModal() {
 
-    document
-        .getElementById("modal")
-        .classList.remove("show");
+    const modal =
+        document.getElementById("modal");
+
+
+    if (modal) {
+
+        modal.classList.remove("show");
+
+    }
 
 }
 
@@ -408,99 +634,199 @@ function closeModal() {
 // ADD / EDIT LINK
 // ========================================
 
-document
-    .getElementById("linkForm")
-    .addEventListener("submit", function(e) {
-
-        e.preventDefault();
+const linkForm =
+    document.getElementById("linkForm");
 
 
-        const id =
-            document
-                .getElementById("editId")
-                .value;
+if (linkForm) {
+
+    linkForm.addEventListener(
+        "submit",
+        async function(e) {
+
+            e.preventDefault();
 
 
-        const data = {
-
-            name:
+            const id =
                 document
-                    .getElementById("linkName")
-                    .value,
-
-            url:
-                document
-                    .getElementById("linkUrl")
-                    .value,
-
-            category:
-                document
-                    .getElementById("linkCategory")
-                    .value,
-
-            description:
-                document
-                    .getElementById("linkDescription")
-                    .value
-
-        };
+                    .getElementById("editId")
+                    .value;
 
 
-        if (id) {
+            const data = {
 
-            const index =
-                links.findIndex(
-                    link => link.id == id
-                );
+                name:
+                    document
+                        .getElementById("linkName")
+                        .value
+                        .trim(),
 
 
-            links[index] = {
+                url:
+                    document
+                        .getElementById("linkUrl")
+                        .value
+                        .trim(),
 
-                ...links[index],
 
-                ...data
+                category:
+                    document
+                        .getElementById("linkCategory")
+                        .value,
+
+
+                description:
+                    document
+                        .getElementById("linkDescription")
+                        .value
+                        .trim()
 
             };
 
 
-            showToast("Link berhasil diperbarui!");
+            // ========================================
+            // EDIT
+            // ========================================
 
-        } else {
-
-            links.unshift({
-
-                id: Date.now(),
-
-                ...data,
-
-                favorite: false
-
-            });
+            if (id) {
 
 
-            showToast("Link berhasil ditambahkan!");
+                const {
+                    data: updatedData,
+                    error
+                } = await db
+
+                    .from("links")
+
+                    .update(data)
+
+                    .eq("id", id)
+
+                    .select()
+
+                    .single();
+
+
+                if (error) {
+
+                    console.error(
+                        "Gagal mengedit link:",
+                        error
+                    );
+
+                    showToast(
+                        "Gagal memperbarui link."
+                    );
+
+                    return;
+
+                }
+
+
+                const index =
+                    links.findIndex(
+                        link =>
+                            String(link.id) ===
+                            String(id)
+                    );
+
+
+                if (index !== -1) {
+
+                    links[index] =
+                        updatedData;
+
+                }
+
+
+                showToast(
+                    "Link berhasil diperbarui!"
+                );
+
+
+            }
+
+
+            // ========================================
+            // TAMBAH
+            // ========================================
+
+            else {
+
+
+                const newLink = {
+
+                    ...data,
+
+                    favorite:
+                        false
+
+                };
+
+
+                const {
+                    data: insertedData,
+                    error
+                } = await db
+
+                    .from("links")
+
+                    .insert([newLink])
+
+                    .select()
+
+                    .single();
+
+
+                if (error) {
+
+                    console.error(
+                        "Gagal menambahkan link:",
+                        error
+                    );
+
+                    showToast(
+                        "Gagal menambahkan link."
+                    );
+
+                    return;
+
+                }
+
+
+                links.unshift(
+                    insertedData
+                );
+
+
+                showToast(
+                    "Link berhasil ditambahkan!"
+                );
+
+            }
+
+
+            closeModal();
+
+            displayLinks();
 
         }
+    );
 
-
-        saveData();
-
-        closeModal();
-
-        displayLinks();
-
-    });
+}
 
 
 // ========================================
-// EDIT
+// EDIT LINK
 // ========================================
 
 function editLink(id) {
 
     const link =
         links.find(
-            item => item.id === id
+            item =>
+                String(item.id) ===
+                String(id)
         );
 
 
@@ -514,10 +840,10 @@ function editLink(id) {
 
 
 // ========================================
-// DELETE
+// DELETE LINK
 // ========================================
 
-function deleteLink(id) {
+async function deleteLink(id) {
 
     const confirmDelete =
         confirm(
@@ -528,17 +854,47 @@ function deleteLink(id) {
     if (!confirmDelete) return;
 
 
+    const {
+        error
+    } = await db
+
+        .from("links")
+
+        .delete()
+
+        .eq("id", id);
+
+
+    if (error) {
+
+        console.error(
+            "Gagal menghapus link:",
+            error
+        );
+
+        showToast(
+            "Gagal menghapus link."
+        );
+
+        return;
+
+    }
+
+
     links =
         links.filter(
-            link => link.id !== id
+            link =>
+                String(link.id) !==
+                String(id)
         );
 
 
-    saveData();
-
     displayLinks();
 
-    showToast("Link berhasil dihapus!");
+
+    showToast(
+        "Link berhasil dihapus!"
+    );
 
 }
 
@@ -547,22 +903,75 @@ function deleteLink(id) {
 // FAVORITE
 // ========================================
 
-function toggleFavorite(id) {
+async function toggleFavorite(id) {
 
     const link =
         links.find(
-            item => item.id === id
+            item =>
+                String(item.id) ===
+                String(id)
         );
 
 
     if (!link) return;
 
 
-    link.favorite =
+    const newFavorite =
         !link.favorite;
 
 
-    saveData();
+    const {
+        data,
+        error
+    } = await db
+
+        .from("links")
+
+        .update({
+
+            favorite:
+                newFavorite
+
+        })
+
+        .eq("id", id)
+
+        .select()
+
+        .single();
+
+
+    if (error) {
+
+        console.error(
+            "Gagal mengubah favorite:",
+            error
+        );
+
+        showToast(
+            "Gagal mengubah favorite."
+        );
+
+        return;
+
+    }
+
+
+    const index =
+        links.findIndex(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (index !== -1) {
+
+        links[index] =
+            data;
+
+    }
+
 
     displayLinks();
 
@@ -576,11 +985,26 @@ function toggleFavorite(id) {
 function copyLink(url) {
 
     navigator.clipboard
+
         .writeText(url)
+
         .then(() => {
 
             showToast(
                 "Link berhasil disalin!"
+            );
+
+        })
+
+        .catch(error => {
+
+            console.error(
+                "Gagal menyalin link:",
+                error
+            );
+
+            showToast(
+                "Gagal menyalin link."
             );
 
         });
@@ -596,7 +1020,8 @@ function openLink(url) {
 
     window.open(
         url,
-        "_blank"
+        "_blank",
+        "noopener,noreferrer"
     );
 
 }
@@ -612,14 +1037,23 @@ function showToast(message) {
         document.getElementById("toast");
 
 
-    toast.textContent = message;
+    if (!toast) return;
 
-    toast.classList.add("show");
+
+    toast.textContent =
+        message;
+
+
+    toast.classList.add(
+        "show"
+    );
 
 
     setTimeout(() => {
 
-        toast.classList.remove("show");
+        toast.classList.remove(
+            "show"
+        );
 
     }, 2500);
 
@@ -635,7 +1069,10 @@ function escapeHTML(text) {
     const div =
         document.createElement("div");
 
-    div.textContent = text;
+
+    div.textContent =
+        text ?? "";
+
 
     return div.innerHTML;
 
@@ -646,21 +1083,35 @@ function escapeHTML(text) {
 // CLOSE MODAL WHEN CLICK OUTSIDE
 // ========================================
 
-document
-    .getElementById("modal")
-    .addEventListener("click", function(e) {
+const modal =
+    document.getElementById("modal");
 
-        if (e.target === this) {
 
-            closeModal();
+if (modal) {
+
+    modal.addEventListener(
+        "click",
+        function(e) {
+
+            if (
+                e.target === this
+            ) {
+
+                closeModal();
+
+            }
 
         }
+    );
 
-    });
+}
 
 
 // ========================================
-// INITIAL DISPLAY
+// INITIAL LOAD
 // ========================================
 
-displayLinks();
+// Data tidak diambil dari localStorage.
+// Data diambil langsung dari Supabase.
+
+loadData();
